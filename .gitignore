@@ -1,0 +1,15 @@
+# macOS
+.DS_Store
+
+# synthesis/library db
+backend/
+
+# simulation outputs
+*.vcd
+*.fsdb
+*.log
+*.out
+
+# temp/editor
+*.swp
+*~
