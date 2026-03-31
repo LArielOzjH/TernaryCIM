@@ -21,13 +21,13 @@ module tb_CimBlock;
     // -----------------------------------------------------------------------
     // Parameters
     // -----------------------------------------------------------------------
-    localparam int N_GROUPS   = 64;
-    localparam int DEPTH      = 128;
-    localparam int ADDR_WIDTH = 7;
+    localparam int N_GROUPS   = 16;
+    localparam int DEPTH      = 32;
+    localparam int ADDR_WIDTH = 5;
     localparam int ACT_SETTLE = 4;   // extra settle cycles after act_valid
 
-    // 500 MHz clock
-    localparam real CLK_HALF = 1.0;   // half-period in ns
+    // 400 MHz clock (matches synthesis constraint T_CLK = 2.5 ns)
+    localparam real CLK_HALF = 1.25;  // half-period in ns
 
     // -----------------------------------------------------------------------
     // DUT signals
@@ -80,8 +80,8 @@ module tb_CimBlock;
     // -----------------------------------------------------------------------
     // Test data memory (loaded from generated hex files)
     // -----------------------------------------------------------------------
-    logic [319:0]   weight_mem [0:DEPTH-1];   // 128 rows × 320 bits
-    logic [7:0]     act_bytes  [0:191];        // 192 uint8 activations
+    logic [79:0]    weight_mem [0:DEPTH-1];   // 32 rows × 80 bits
+    logic [7:0]     act_bytes  [0:47];         // 48 uint8 activations
     logic [7:0]     zp_byte    [0:0];          // 1-byte zero point
     logic [31:0]    golden     [0:DEPTH-1];    // 128 × 32-bit golden outputs
 
@@ -142,7 +142,7 @@ module tb_CimBlock;
             // Pack byte array into 1536-bit act_in
             // Layout: group i uses bytes [3*i*8 +: 24]
             //   act0_i = act_bytes[3*i], act1_i = act_bytes[3*i+1], act2_i = act_bytes[3*i+2]
-            for (i = 0; i < 192; i = i + 1) begin
+            for (i = 0; i < 3*N_GROUPS; i = i + 1) begin
                 act_in[8*i +: 8] = act_bytes[i];
             end
             zp_in = zp_byte[0];
@@ -174,7 +174,13 @@ module tb_CimBlock;
             $display("[%0t] Reading %0d rows (2-cycle pipeline)...", $time, DEPTH);
 
             for (cyc = 0; cyc <= DEPTH + 1; cyc = cyc + 1) begin
-                // Drive read port
+                // Drive read port at negedge so cim_raddr is stable before the
+                // next posedge activates rd_clock. Driving at posedge+#1 was
+                // correct for CLK_HALF=1.0 (negedge coincidence) but incorrect
+                // for CLK_HALF=1.25: cim_raddr would change 0.25 ns before the
+                // negedge while rd_clock/RA6T latch is still transparent,
+                // causing the latch to capture the next row's data instead.
+                @(negedge clk); #0.1;
                 if (cyc < DEPTH) begin
                     cim_ren   = 1;
                     cim_raddr = cyc[ADDR_WIDTH-1:0];
@@ -183,7 +189,8 @@ module tb_CimBlock;
                     cim_raddr = '0;
                 end
 
-                @(posedge clk); #1;
+                // Check output shortly after posedge (OutReg has updated).
+                @(posedge clk); #0.1;
 
                 // Capture when valid
                 if (cim_odata_valid) begin
@@ -232,8 +239,18 @@ module tb_CimBlock;
 
         do_reset();
         write_all_weights();
+
+`ifdef SAIF
+        // Single window covering the full inference (LUT build + compute).
+        $set_toggle_region(dut);
+        $toggle_start();
+`endif
         load_activations();
         read_all_rows();
+`ifdef SAIF
+        $toggle_stop();
+        $toggle_report("tests/sim.saif", 1.0e-9, "tb_CimBlock");
+`endif
 
         // Write simulation outputs to file
         out_fd = $fopen("tests/sim_output.hex", "w");

@@ -1,18 +1,18 @@
-// DualAdderTree: sign-magnitude dual adder tree for 64 LUT lookup results.
+// DualAdderTree: sign-magnitude dual adder tree for 16 LUT lookup results.
 //
-// Each of the 64 inputs is a sign-magnitude pair {sign, mag[9:0]}.
+// Each of the 16 inputs is a sign-magnitude pair {sign, mag[9:0]}.
 // - If sign=0: value is positive → accumulate into POS tree
 // - If sign=1: value is negative → accumulate into NEG tree (using magnitude)
 // Output = POS_sum - NEG_sum (32-bit signed).
 //
-// POS/NEG trees sum up to 64 × 10-bit unsigned values:
-//   Max per-tree sum = 64 × 765 = 48,960 → 16-bit (48960 < 65536 = 2^16)
-// Result range: -48,960 .. +48,960 → fits in 17 bits signed; output as 32-bit.
+// POS/NEG trees sum up to 16 × 10-bit unsigned values:
+//   Max per-tree sum = 16 × 765 = 12,240 → 14-bit (12240 < 16384 = 2^14)
+// Result range: -12,240 .. +12,240 → fits in 15 bits signed; output as 32-bit.
 
 module DualAdderTree #(
-    parameter int N = 64        // number of input groups
+    parameter int N = 16        // number of input groups
 )(
-    // Packed SM inputs: {sign[0], mag[9:0]} × N = 11 bits × 64
+    // Packed SM inputs: {sign[0], mag[9:0]} × N = 11 bits × 16
     input  var logic [10:0]          sm_in [0:N-1],
 
     output var logic signed [31:0]   result

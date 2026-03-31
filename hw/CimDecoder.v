@@ -1,6 +1,6 @@
 
 module CimDecoder #(
-    parameter DEPTH      = 128,
+    parameter DEPTH      = 32,
     parameter ADDR_WIDTH = $clog2(DEPTH)
 )(
     input                   CK,

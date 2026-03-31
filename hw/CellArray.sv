@@ -1,7 +1,7 @@
 module CellArray #(
-    parameter int DEPTH      = 128,
+    parameter int DEPTH      = 32,
     parameter int ADDR_WIDTH = $clog2(DEPTH),
-    parameter int WIDTH      = 320       // 64 groups × 5 bits/group
+    parameter int WIDTH      = 80        // 16 groups × 5 bits/group
 )(
     input  var logic                            clock,
 
@@ -55,7 +55,7 @@ module CellArray #(
 endmodule: CellArray
 
 /*
-    SRAM array: DEPTH=128 rows × WIDTH=320 bits per row.
+    SRAM array: DEPTH=16 rows × WIDTH=320 bits per row.
     320 bits = 64 groups × 5 bits/group (5-pack-3 ternary weight encoding).
     Each CimRow stores one bit plane across all DEPTH rows.
     Decoder is parametric; CimDecoderBuffer drives word lines.

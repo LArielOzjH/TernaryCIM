@@ -8,8 +8,8 @@
 // read latency is consistent with CimMacro's one-cycle read pipeline.
 
 module CimBlock #(
-    parameter int N_GROUPS   = 64,
-    parameter int DEPTH      = 128,
+    parameter int N_GROUPS   = 16,
+    parameter int DEPTH      = 32,
     parameter int ADDR_WIDTH = $clog2(DEPTH)
 )(
     input  var logic                        clk,

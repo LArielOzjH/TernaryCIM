@@ -1,4 +1,4 @@
-// ZpCompensate: accumulates the zero-point compensation term across 64 weight groups.
+// ZpCompensate: accumulates the zero-point compensation term across 16 weight groups.
 //
 // For each group i:
 //   W · A = W · (H4×16 + L4)
@@ -28,7 +28,7 @@
 // Output: 32-bit signed compensation to add to DualAdderTree result (left-shifted by 4).
 
 module ZpCompensate #(
-    parameter int N = 64    // number of weight groups per row
+    parameter int N = 16    // number of weight groups per row
 )(
     // ZP info (common to all groups)
     input  var logic [3:0]          zp_h4,          // ZP[7:4]

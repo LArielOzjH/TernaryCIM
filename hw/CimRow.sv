@@ -1,5 +1,5 @@
 module CimRow #(
-    parameter int DEPTH = 128
+    parameter int DEPTH = 32
 )(
     input  var logic                      DIN, DINB, CKW, CKR, 
     input  var logic [DEPTH - 1 : 0]      RWL, WWL,

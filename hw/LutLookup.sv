@@ -16,12 +16,12 @@
 //   data=100: (+1,+1,-1) → entry[011] - entry[100]   = (A0+A1) - A2
 //   data=101: (+1,-1,-1) → entry[001] - entry[110]   = A0 - (A1+A2)
 //
-// Entry SM format: {sign[10], mag[9:0]} = 11 bits.
-// Output SM format: {out_sign, out_mag[9:0]}.
+// Entry format: 6-bit unsigned magnitude (no sign bit; flag=0 entries always non-negative).
+// Output SM format: {out_sign, out_mag[9:0]}  (out_mag zero-extended from 6 bits).
 
 module LutLookup (
     input  var logic [4:0]   weight_code,    // {sign[4], flag[3], data[2:0]}
-    input  var logic [10:0]  entry [0:7],    // flag=0 stored SM entries from LutBuilder
+    input  var logic [5:0]   entry [0:7],    // flag=0 stored 6-bit magnitude entries from LutBuilder
 
     output var logic         out_sign,       // final sign (after group sign XOR)
     output var logic [9:0]   out_mag         // final magnitude
@@ -39,13 +39,13 @@ module LutLookup (
     assign all_zero = (weight_code[3:0] == 4'b1111);
 
     // --- Flag=0 path: direct lookup ---
-    logic [10:0] direct_entry;
-    assign direct_entry = entry[data];  // data used as index (sign bit always 0)
+    logic [5:0] direct_entry;
+    assign direct_entry = entry[data];
 
     // --- Flag=1 path: dynamic computation ---
     // Each flag=1 case = (minuend entry) - (subtrahend entry)
     // Result may be negative; convert to SM.
-    logic [10:0] minuend, subtrahend;
+    logic [5:0] minuend, subtrahend;
     always_comb begin
         case (data)
             3'd0: begin minuend = entry[3'b010]; subtrahend = entry[3'b100]; end // A1 - A2
@@ -58,15 +58,14 @@ module LutLookup (
         endcase
     end
 
-    // minuend and subtrahend have sign=0 (flag=0 entries are always non-negative),
-    // so their magnitude is simply entry[9:0].
-    logic [9:0]  min_mag, sub_mag;
-    assign min_mag = minuend[9:0];
-    assign sub_mag = subtrahend[9:0];
+    // Entries are always non-negative, so magnitude = entry value directly.
+    logic [5:0]  min_mag, sub_mag;
+    assign min_mag = minuend;
+    assign sub_mag = subtrahend;
 
-    // SM result of (min_mag - sub_mag)
+    // SM result of (min_mag - sub_mag); max magnitude = 45, fits in 6 bits.
     logic        dyn_sign;
-    logic [9:0]  dyn_mag;
+    logic [5:0]  dyn_mag;
     always_comb begin
         if (min_mag >= sub_mag) begin
             dyn_sign = 1'b0;
@@ -86,10 +85,10 @@ module LutLookup (
             raw_mag  = 10'd0;
         end else if (flag_bit) begin
             raw_sign = dyn_sign;
-            raw_mag  = dyn_mag;
+            raw_mag  = {4'b0, dyn_mag};    // zero-extend 6-bit result to 10 bits
         end else begin
-            raw_sign = direct_entry[10];   // always 0 for flag=0 entries
-            raw_mag  = direct_entry[9:0];
+            raw_sign = 1'b0;               // flag=0 entries always non-negative
+            raw_mag  = {4'b0, direct_entry}; // zero-extend 6-bit entry to 10 bits
         end
     end
 

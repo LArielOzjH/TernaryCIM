@@ -1,10 +1,10 @@
 // CimMacro: top-level CIM macro for Ternary LLM (W1.58, A8) inference.
 //
 // Architecture:
-//   - SRAM: DEPTH=128 rows × WIDTH=320 bits (64 groups × 5 bits/group, 5-pack-3 encoding)
-//   - LUT phase (act_valid=1): latch 192 INT8 activations + ZP → build 64 per-group LUTs
+//   - SRAM: DEPTH=32 rows × WIDTH=80 bits (16 groups × 5 bits/group, 5-pack-3 encoding)
+//   - LUT phase (act_valid=1): latch 48 INT8 activations + ZP → build 16 per-group LUTs
 //   - Compute phase (cim_ren=1): for each row read, perform
-//       64× LUT lookup → SM Dual Adder Tree → ZP compensation → 32-bit output
+//       16× LUT lookup → SM Dual Adder Tree → ZP compensation → 32-bit output
 //
 // Activation bus layout (act_in[24*i +: 24] = group i):
 //   group i: act_in[24*i +: 8] = act0_i, act_in[24*i+8 +: 8] = act1_i, act_in[24*i+16 +: 8] = act2_i
@@ -15,8 +15,8 @@
 // Output: cim_odata valid one cycle after cim_ren.
 
 module CimMacro #(
-    parameter int N_GROUPS   = 64,
-    parameter int DEPTH      = 128,
+    parameter int N_GROUPS   = 16,
+    parameter int DEPTH      = 32,
     parameter int ADDR_WIDTH = $clog2(DEPTH)
 )(
     input  var logic                        clk,
@@ -51,7 +51,7 @@ module CimMacro #(
     end
 
     // -----------------------------------------------------------------------
-    // SRAM: 128 × 320 weight storage
+    // SRAM: 32 × 80 weight storage
     // -----------------------------------------------------------------------
     logic [5*N_GROUPS-1:0] w_out;   // raw 320-bit word from current row
 
@@ -90,7 +90,7 @@ module CimMacro #(
     logic signed [4:0]   delta2_comb [0:N_GROUPS-1];
     logic                all_zp_comb [0:N_GROUPS-1];
 
-    logic [10:0]         lut_comb [0:N_GROUPS-1][0:7];
+    logic [5:0]          lut_comb [0:N_GROUPS-1][0:7];
 
     for (genvar i = 0; i < N_GROUPS; i++) begin : GEN_SPLIT_BUILD
         assign act0_in[i] = act_in[24*i    +: 8];
@@ -133,7 +133,7 @@ module CimMacro #(
     logic signed [4:0]   delta0_reg [0:N_GROUPS-1];
     logic signed [4:0]   delta1_reg [0:N_GROUPS-1];
     logic signed [4:0]   delta2_reg [0:N_GROUPS-1];
-    logic [10:0]         lut_reg [0:N_GROUPS-1][0:7];
+    logic [5:0]          lut_reg [0:N_GROUPS-1][0:7];
 
     always_ff @(posedge clk, posedge reset) begin
         if (reset) begin

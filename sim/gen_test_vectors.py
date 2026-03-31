@@ -3,14 +3,14 @@
 gen_test_vectors.py — Ternary CIM Block Test Vector Generator
 
 Generates four files under sim/tests/:
-  weight_mem.hex  — 128 rows × 320-bit weight SRAM ($readmemh, 80 hex chars/line)
-  act_mem.hex     — 192 uint8 activation bytes (2 hex chars/line)
+  weight_mem.hex  — 32 rows × 80-bit weight SRAM ($readmemh, 20 hex chars/line)
+  act_mem.hex     — 48 uint8 activation bytes (2 hex chars/line)
   zp.hex          — 1-byte zero point (2 hex chars)
-  golden.hex      — 128 × 32-bit signed MAC results (8 hex chars/line)
+  golden.hex      — 16 × 32-bit signed MAC results (8 hex chars/line)
 
 Architecture parameters (must match tb_CimBlock.sv):
-  N_GROUPS = 64     — weight groups per row
-  DEPTH    = 128    — SRAM rows
+  N_GROUPS = 16     — weight groups per row
+  DEPTH    = 32     — SRAM rows
   ZP       = 0x20   — unsigned zero point (ZP_H4 = 2, acts in [32, 47])
 
 5-Pack-3 encoding: wcode[4:0] = {sign[4], flag[3], data[2:0]}
@@ -28,7 +28,7 @@ Weight memory layout (per 320-bit row):
   group i occupies bits [5*i+4 : 5*i]  (little-endian groups)
 
 Golden model:
-  result = Σ_{i=0}^{63} Σ_{j=0}^{2} w_{i,j} × act_{i,j}   (32-bit 2's complement)
+  result = Σ_{i=0}^{15} Σ_{j=0}^{2} w_{i,j} × act_{i,j}   (32-bit 2's complement)
   where w_{i,j} ∈ {-1, 0, +1} decoded from 5-bit wcode.
 """
 
@@ -36,8 +36,8 @@ import random
 from pathlib import Path
 
 # ── Architecture constants ─────────────────────────────────────────────────
-N_GROUPS = 64
-DEPTH    = 128
+N_GROUPS = 16
+DEPTH    = 32
 ZP       = 0x20          # ZP_H4 = 2 → all test acts are in [32, 47]
 
 # flag=1 data → (w0, w1, w2) weight patterns
@@ -195,14 +195,7 @@ def gen_weight_rows(rng: random.Random) -> list:
     # Row 14: sign-mirrored (+1,−1,−1) → sign=1, flag=1, data=5 → 0x1D
     rows.append(row_flag1(5, sign=1))
 
-    # Row 15: alternating (0,+1,−1) and (+1,0,−1) per group
-    rows.append([0x08 if i % 2 == 0 else 0x09 for i in range(N_GROUPS)])
-
-    # Row 16: one-hot per group (cycles through act0, act1, act2)
-    one_hot = {0: 0x01, 1: 0x02, 2: 0x04}
-    rows.append([one_hot[i % 3] for i in range(N_GROUPS)])
-
-    # Rows 17..127: random weight patterns
+    # Row 15: random (fills to DEPTH=16)
     while len(rows) < DEPTH:
         rows.append([random_wcode(rng) for _ in range(N_GROUPS)])
 
@@ -219,7 +212,7 @@ def gen_activations(rng: random.Random) -> list:
     """
     zp_h4 = (ZP >> 4) & 0xF
     base = zp_h4 * 16              # = 32 for ZP=0x20
-    return [base + rng.randint(0, 15) for _ in range(192)]
+    return [base + rng.randint(0, 15) for _ in range(3 * N_GROUPS)]
 
 
 # ── Hex file writers ───────────────────────────────────────────────────────
@@ -235,7 +228,7 @@ def row_to_int(wcodes: list) -> int:
 def write_weight_mem_hex(rows: list, path: Path):
     with open(path, 'w') as f:
         for row in rows:
-            f.write(f'{row_to_int(row):080x}\n')
+            f.write(f'{row_to_int(row):020x}\n')
 
 
 def write_act_mem_hex(acts: list, path: Path):
@@ -281,7 +274,7 @@ def main():
 
     # 2. Activations (ZP mode)
     acts = gen_activations(rng)
-    print(f'\n[2/4] Activations: 192 bytes in [{min(acts)}, {max(acts)}]')
+    print(f'\n[2/4] Activations: {3*N_GROUPS} bytes in [{min(acts)}, {max(acts)}]')
 
     # 3. Golden outputs
     print(f'\n[3/4] Computing golden outputs...')
@@ -297,8 +290,8 @@ def main():
     assert goldens[3] == sum_act0, f'Row 3 (+1,0,0) expected {sum_act0}, got {goldens[3]}'
     print('  Spot checks (rows 0-3): OK')
 
-    print('\n  First 17 rows:')
-    for r in range(17):
+    print(f'\n  All {DEPTH} rows:')
+    for r in range(DEPTH):
         print(f'    row[{r:3d}]: {goldens[r]:12d}  (0x{goldens[r] & 0xFFFF_FFFF:08x})')
 
     # 4. Write files

@@ -12,7 +12,7 @@
 //   entry[d] = Σ l4_i  for all i where d[i] = 1
 //
 // L4 max value = 15, so max entry magnitude = 3×15 = 45 → fits in 6 bits.
-// Output: {sign[0]=0, mag[9:0]} = 11 bits per entry (upper 4 bits always 0).
+// Output: 6-bit unsigned magnitude per entry (no sign bit; entries always non-negative).
 // Flag=1 entries are derived dynamically in LutLookup.
 
 module LutBuilder (
@@ -24,36 +24,36 @@ module LutBuilder (
     input  var logic [3:0]  l4_2,       // low nibble of act2
     input  var logic        all_zp,     // 1=ZP mode (use L4); 0=full (use act)
 
-    // Flag=0 SM entries, indexed [0..7].
-    // Bit 10 = sign (always 0), bits [9:0] = magnitude.
-    output var logic [10:0] entry [0:7]
+    // Flag=0 LUT entries, indexed [0..7].
+    // 6-bit unsigned magnitude (max 45); no sign bit needed.
+    output var logic [5:0] entry [0:7]
 );
     // Source values: always L4 (ZpCompensate handles the H4 term).
     // all_zp is kept as an input for connectivity but does not affect the output.
-    logic [9:0] src0, src1, src2;
-    assign src0 = {6'b0, l4_0};
-    assign src1 = {6'b0, l4_1};
-    assign src2 = {6'b0, l4_2};
+    logic [5:0] src0, src1, src2;
+    assign src0 = {2'b0, l4_0};
+    assign src1 = {2'b0, l4_1};
+    assign src2 = {2'b0, l4_2};
 
-    // entry[d]: sign=0, magnitude = conditional sum of sources
+    // entry[d]: magnitude = conditional sum of sources (max 45 < 64, no overflow)
     // Expanded explicitly to avoid tool-specific int-indexing issues.
     always_comb begin
         // d=000: no sources active → 0
-        entry[0] = 11'd0;
+        entry[0] = 6'd0;
         // d=001: only A0
-        entry[1] = {1'b0, src0};
+        entry[1] = src0;
         // d=010: only A1
-        entry[2] = {1'b0, src1};
+        entry[2] = src1;
         // d=011: A0 + A1
-        entry[3] = {1'b0, src0 + src1};
+        entry[3] = src0 + src1;
         // d=100: only A2
-        entry[4] = {1'b0, src2};
+        entry[4] = src2;
         // d=101: A0 + A2
-        entry[5] = {1'b0, src0 + src2};
+        entry[5] = src0 + src2;
         // d=110: A1 + A2
-        entry[6] = {1'b0, src1 + src2};
+        entry[6] = src1 + src2;
         // d=111: A0 + A1 + A2
-        entry[7] = {1'b0, src0 + src1 + src2};
+        entry[7] = src0 + src1 + src2;
     end
 
 endmodule: LutBuilder

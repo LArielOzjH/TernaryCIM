@@ -3,11 +3,15 @@
 
 # synthesis/library db
 backend/
-
+doc/
+sim/csrc/
+sim/*.daidir/
 # simulation outputs
+
 *.vcd
 *.fsdb
 *.log
+*.saif
 *.out
 
 # temp/editor
