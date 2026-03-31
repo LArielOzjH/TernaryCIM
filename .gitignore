@@ -4,6 +4,8 @@
 # synthesis/library db
 backend/
 doc/
+sim/ucli.key
+sim/simv*
 sim/csrc/
 sim/*.daidir/
 # simulation outputs
